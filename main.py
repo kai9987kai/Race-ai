@@ -1,7 +1,7 @@
 import turtle
 import random
 import time
-import multiprocessing
+import threading
 
 # Set up the screen
 screen = turtle.Screen()
@@ -111,6 +111,17 @@ def move_bot(bot):
     bot['x'] += dx
     bot['y'] += dy
 
+    # Check collision with obstacles
+    for obstacle in obstacles:
+        if (
+            obstacle['x'] <= bot['x'] <= obstacle['x'] + obstacle_size and
+            obstacle['y'] <= bot['y'] <= obstacle['y'] + obstacle_size
+        ):
+            # Collision detected, reset bot position
+            bot['x'] = random.randint(-180, 180)
+            bot['y'] = random.randint(-180, 180)
+            break
+
 # Activation function
 def activation_function(x):
     return 1 / (1 + pow(2.71828, -x))
@@ -177,7 +188,15 @@ def reset_game():
 drawer.speed(0)
 drawer.up()
 
-# Main game loop
+# Hide the turtle window for the finish line and obstacles
+turtle.screensize(10, 10)
+
+# Create the main turtle window
+main_window = turtle.Screen()
+main_window.title("Bot Race")
+main_window.setup(400, 400)
+main_window.tracer(0)
+
 running = True
 generation = 1
 
@@ -196,20 +215,21 @@ for _ in range(population_size):
     obstacles.append(obstacle)
 
 while running:
-    processes = []
+    threads = []
     for bot in bots:
-        process = multiprocessing.Process(target=move_bot, args=(bot,))
-        process.start()
-        processes.append(process)
+        thread = threading.Thread(target=move_bot, args=(bot,))
+        thread.start()
+        threads.append(thread)
 
-    for process in processes:
-        process.join()
+    for thread in threads:
+        thread.join()
 
     draw_game_objects()
     time.sleep(0.001)  # Delay for smoother animation
 
     # Check if all bots reached the finish line
     if all(check_finish(bot) for bot in bots):
+        print("Loading...")
         update_brains()
         reset_game()
         generation += 1
@@ -219,4 +239,15 @@ while running:
         fitness_scores = [bot['fitness'] for bot in bots]
         print(f"Fitness Scores: {fitness_scores}")
 
-        time.sleep()
+        # Hide all turtle windows except for the main window
+        for window in turtle.Screen().screens():
+            if window != main_window:
+                window.tracer(0)
+                window.bye()
+
+        # Show the main turtle window
+        main_window.update()
+
+    main_window.update()
+
+turtle.done()
