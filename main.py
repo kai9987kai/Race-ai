@@ -280,13 +280,6 @@ while running:
         fitness_scores = [bot['fitness'] for bot in bots]
         print(f"Fitness Scores: {fitness_scores}")
 
-        # Hide all turtle windows except for the main window
-        for window in turtle.Screen().screens():
-            if window != main_window:
-                window.tracer(0)
-                window.bye()
-
-        # Show the main turtle window
         main_window.update()
 
     main_window.update()
