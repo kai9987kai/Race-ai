@@ -5,7 +5,7 @@ import threading
 
 # Set up the screen
 screen = turtle.Screen()
-screen.setup(400, 400)
+screen.setup(600, 600)
 screen.title("Bot Race")
 screen.bgcolor("white")
 
@@ -33,13 +33,17 @@ num_hidden_layers = 1
 population_size = 50
 mutation_rate = 0.1
 
+# Bounded area properties
+area_min = -200
+area_max = 200
+
 # Initialize bots
 def initialize_bots():
     bots = []
     for _ in range(population_size):
         bot = {
-            'x': random.randint(-180, 180),
-            'y': random.randint(-180, 180),
+            'x': random.randint(area_min + bot_radius, area_max - bot_radius),
+            'y': random.randint(area_min + bot_radius, area_max - bot_radius),
             'dx': 0,
             'dy': 0,
             'fitness': 0,
@@ -108,19 +112,36 @@ def move_bot(bot):
     dx = inputs[-2]
     dy = inputs[-1]
 
-    bot['x'] += dx
-    bot['y'] += dy
+    new_x = bot['x'] + dx
+    new_y = bot['y'] + dy
 
     # Check collision with obstacles
     for obstacle in obstacles:
-        if (
-            obstacle['x'] <= bot['x'] <= obstacle['x'] + obstacle_size and
-            obstacle['y'] <= bot['y'] <= obstacle['y'] + obstacle_size
-        ):
+        if is_collision(new_x, new_y, bot_radius, obstacle['x'], obstacle['y'], obstacle_size):
             # Collision detected, reset bot position
-            bot['x'] = random.randint(-180, 180)
-            bot['y'] = random.randint(-180, 180)
+            new_x = random.randint(area_min + bot_radius, area_max - bot_radius)
+            new_y = random.randint(area_min + bot_radius, area_max - bot_radius)
             break
+
+    # Check collision with area boundaries
+    if new_x < area_min + bot_radius or new_x > area_max - bot_radius:
+        new_x = bot['x']
+    if new_y < area_min + bot_radius or new_y > area_max - bot_radius:
+        new_y = bot['y']
+
+    bot['x'] = new_x
+    bot['y'] = new_y
+
+# Function to check if two objects collide
+def is_collision(x1, y1, size1, x2, y2, size2):
+    if (
+        x1 + size1 >= x2 and
+        x1 <= x2 + size2 and
+        y1 + size1 >= y2 and
+        y1 <= y2 + size2
+    ):
+        return True
+    return False
 
 # Activation function
 def activation_function(x):
@@ -170,16 +191,37 @@ def update_brains():
 # Function to reset the game for the next iteration
 def reset_game():
     global bots, finish_line, obstacles
-    bots = initialize_bots()
+    bots.sort(key=lambda x: x['fitness'], reverse=True)
+    best_bots = bots[:population_size // 2]  # Select the best performing bots
+
+    # Update the bots based on fitness scores
+    for i in range(population_size // 2, population_size):
+        parent1 = random.choice(best_bots)
+        parent2 = random.choice(best_bots)
+
+        new_brain = []
+        for j in range(num_synapses):
+            if random.random() < mutation_rate:
+                synapse = [random.uniform(-1, 1) for _ in range(len(parent1['brain'][j]))]
+            else:
+                if random.random() < 0.5:
+                    synapse = parent1['brain'][j]
+                else:
+                    synapse = parent2['brain'][j]
+            new_brain.append(synapse)
+
+        bots[i]['brain'] = new_brain
+
+    # Reset the game parameters
     finish_line = {
-        'x': random.randint(-180, 180 - finish_line_width),
-        'y': random.randint(-180, 180 - finish_line_height)
+        'x': random.randint(area_min, area_max - finish_line_width),
+        'y': random.randint(area_min, area_max - finish_line_height)
     }
     obstacles = []
     for _ in range(population_size):
         obstacle = {
-            'x': random.randint(-180, 180 - obstacle_size),
-            'y': random.randint(-180, 180 - obstacle_size),
+            'x': random.randint(area_min, area_max - obstacle_size),
+            'y': random.randint(area_min, area_max - obstacle_size),
             'color': random.choice(['red', 'green'])
         }
         obstacles.append(obstacle)
@@ -194,7 +236,7 @@ turtle.screensize(10, 10)
 # Create the main turtle window
 main_window = turtle.Screen()
 main_window.title("Bot Race")
-main_window.setup(400, 400)
+main_window.setup(600, 600)
 main_window.tracer(0)
 
 running = True
@@ -202,14 +244,14 @@ generation = 1
 
 bots = initialize_bots()
 finish_line = {
-    'x': random.randint(-180, 180 - finish_line_width),
-    'y': random.randint(-180, 180 - finish_line_height)
+    'x': random.randint(area_min, area_max - finish_line_width),
+    'y': random.randint(area_min, area_max - finish_line_height)
 }
 obstacles = []
 for _ in range(population_size):
     obstacle = {
-        'x': random.randint(-180, 180 - obstacle_size),
-        'y': random.randint(-180, 180 - obstacle_size),
+        'x': random.randint(area_min, area_max - obstacle_size),
+        'y': random.randint(area_min, area_max - obstacle_size),
         'color': random.choice(['red', 'green'])
     }
     obstacles.append(obstacle)
@@ -227,10 +269,9 @@ while running:
     draw_game_objects()
     time.sleep(0.001)  # Delay for smoother animation
 
-    # Check if all bots reached the finish line
-    if all(check_finish(bot) for bot in bots):
+    # Check if any bot reached the finish line
+    if any(check_finish(bot) for bot in bots):
         print("Loading...")
-        update_brains()
         reset_game()
         generation += 1
         print(f"Generation {generation}")
